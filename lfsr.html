@@ -1,0 +1,1406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive LFSR → Continuous PRBS</title>
+  <style>
+    :root {
+      --bg-main: #070d19;
+      --bg-card: #0d172a;
+      --bg-card-alt: #13223f;
+      --bg-input: #091326;
+      --border-color: #1e3a5f;
+      --border-focus: #38bdf8;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent-cyan: #38bdf8;
+      --accent-cyan-glow: rgba(56, 189, 248, 0.35);
+      --accent-yellow: #fbbf24;
+      --accent-yellow-glow: rgba(251, 191, 36, 0.3);
+      --accent-emerald: #34d399;
+      --accent-rose: #f43f5e;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      padding: 24px 32px 48px;
+      line-height: 1.5;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    h1 span.arrow {
+      color: var(--accent-cyan);
+      font-size: 1.8rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.98rem;
+    }
+
+    /* Layout Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 1080px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card Panels */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      position: relative;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-bottom: 18px;
+    }
+
+    /* Config Controls */
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-end;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .input-field, .select-field {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .input-field:focus, .select-field:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-cyan-glow);
+    }
+
+    .input-field.invalid {
+      border-color: var(--accent-rose);
+      box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #192a4a;
+      color: #e2e8f0;
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: #223760;
+      border-color: #3b82f6;
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: #0369a1;
+      border-color: #7dd3fc;
+    }
+
+    .btn-play.playing {
+      background: #d97706;
+      border-color: #fbbf24;
+      color: #ffffff;
+    }
+
+    .speed-wrapper {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Register Big Cards */
+    .section-subtitle {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 12px;
+      letter-spacing: 0.02em;
+    }
+
+    .register-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .reg-card {
+      background: var(--bg-card-alt);
+      border: 2px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .reg-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .reg-card.tap-a {
+      border-color: var(--accent-yellow);
+      box-shadow: 0 0 12px var(--accent-yellow-glow);
+    }
+
+    .reg-card.tap-b {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px var(--accent-cyan-glow);
+    }
+
+    .reg-card.tap-both {
+      border-color: #a855f7;
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.4);
+    }
+
+    .reg-header {
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .reg-card.tap-a .reg-header {
+      color: var(--accent-yellow);
+    }
+    .reg-card.tap-b .reg-header {
+      color: var(--accent-cyan);
+    }
+    .reg-card.tap-both .reg-header {
+      color: #c084fc;
+    }
+
+    .reg-val {
+      font-size: 1.85rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: #ffffff;
+      line-height: 1;
+    }
+
+    .reg-click-hint {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Circuit Diagram Container */
+    .circuit-container {
+      background: #091224;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px 12px;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .circuit-svg {
+      width: 100%;
+      height: 180px;
+      display: block;
+    }
+
+    .circuit-caption {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+    }
+
+    /* Math / Live Feedback Box */
+    .formula-bar {
+      background: #0a152d;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .formula-part-left {
+      color: #e2e8f0;
+    }
+
+    .formula-part-left span.highlight-a {
+      color: var(--accent-yellow);
+    }
+
+    .formula-part-left span.highlight-b {
+      color: var(--accent-cyan);
+    }
+
+    .formula-part-left span.fb-result {
+      color: var(--accent-emerald);
+      font-weight: 800;
+    }
+
+    .formula-part-right {
+      color: var(--accent-cyan);
+    }
+
+    /* Stats Grid */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-box {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-val {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: #ffffff;
+    }
+
+    .convention-note {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      line-height: 1.45;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    /* Right Column: Truth Table */
+    .table-card {
+      margin-bottom: 24px;
+    }
+
+    .table-container {
+      max-height: 290px;
+      overflow-y: auto;
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: #091224;
+    }
+
+    /* Custom scrollbar */
+    .table-container::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background: #1e3a5f;
+      border-radius: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      text-align: center;
+    }
+
+    th {
+      background: #0f2445;
+      color: #94a3b8;
+      font-weight: 600;
+      padding: 10px 8px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 7px 8px;
+      border-bottom: 1px solid rgba(30, 58, 95, 0.4);
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    tr.active-step-row td {
+      background: rgba(2, 132, 199, 0.35) !important;
+      color: #ffffff !important;
+      font-weight: bold;
+      border-top: 1px solid var(--accent-cyan);
+      border-bottom: 1px solid var(--accent-cyan);
+    }
+
+    tr.active-step-row td:first-child {
+      position: relative;
+    }
+    tr.active-step-row td:first-child::before {
+      content: '▶';
+      position: absolute;
+      left: 4px;
+      color: var(--accent-cyan);
+      font-size: 0.7rem;
+    }
+
+    .cycle-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .cycle-maximal {
+      background: rgba(52, 211, 153, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, 0.4);
+    }
+    .cycle-short {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    /* PRBS Stream Section */
+    .stream-box {
+      background: #091224;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      min-height: 60px;
+      max-height: 110px;
+      overflow-y: auto;
+      margin-bottom: 14px;
+      word-break: break-all;
+      line-height: 1.6;
+    }
+
+    .prbs-label {
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-right: 8px;
+    }
+
+    .bit-token {
+      display: inline-block;
+      padding: 0 3px;
+      color: #cbd5e1;
+      transition: all 0.3s ease;
+    }
+
+    .bit-token.latest {
+      color: #ffffff;
+      background: var(--accent-cyan);
+      border-radius: 3px;
+      font-weight: 800;
+      box-shadow: 0 0 10px var(--accent-cyan);
+      transform: scale(1.15);
+    }
+
+    .stream-status-row {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Bottom Info Banner */
+    .info-footer-banner {
+      margin-top: 24px;
+      background: #091428;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .info-footer-banner strong {
+      color: #ffffff;
+    }
+
+    .theory-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .theory-pill {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      color: #bae6fd;
+    }
+
+    /* Sound and toast toggles */
+    .quick-bar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .toggle-sound-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .toggle-sound-btn.active {
+      color: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+    }
+
+    /* Notification toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0284c7;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>Interactive LFSR <span class="arrow">→</span> Continuous PRBS</h1>
+    <p class="subtitle">Change the initial state or XOR feedback taps. The register diagram, truth table, and PRBS output update together.</p>
+  </header>
+
+  <!-- Main Grid -->
+  <main class="dashboard-grid">
+    
+    <!-- Left Column: Configure and Schematic -->
+    <section class="card">
+      <div class="card-title">
+        <span>1. Configure the LFSR</span>
+        <div class="quick-bar">
+          <button id="soundToggle" class="toggle-sound-btn" title="Toggle audio tick click">🔊 Audio: On</button>
+        </div>
+      </div>
+      <p class="card-desc">Set the 4-bit seed and choose which flip-flop taps feed into the XOR feedback gate.</p>
+
+      <!-- Input Controls -->
+      <div class="controls-row">
+        <div class="input-group">
+          <label class="input-label" for="seedInput">Initial state (Q3 Q2 Q1 Q0)</label>
+          <input type="text" id="seedInput" class="input-field" value="1001" maxlength="4" style="width: 130px; letter-spacing: 2px;">
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="tapASelect">Feedback tap A</label>
+          <select id="tapASelect" class="select-field">
+            <option value="3" selected>Q3</option>
+            <option value="2">Q2</option>
+            <option value="1">Q1</option>
+            <option value="0">Q0</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="tapBSelect">Feedback tap B</label>
+          <select id="tapBSelect" class="select-field">
+            <option value="3">Q3</option>
+            <option value="2">Q2</option>
+            <option value="1">Q1</option>
+            <option value="0" selected>Q0</option>
+          </select>
+        </div>
+
+        <div class="input-group speed-wrapper">
+          <label class="input-label" for="speedSelect">Speed</label>
+          <select id="speedSelect" class="select-field">
+            <option value="1000">Slow</option>
+            <option value="400" selected>Normal</option>
+            <option value="150">Fast</option>
+            <option value="40">Super</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Button Toolbar -->
+      <div class="btn-group">
+        <button id="stepBtn" class="btn btn-primary" title="Step one clock pulse [Spacebar]">
+          <span>▶</span> Clock one step
+        </button>
+        <button id="playBtn" class="btn btn-play" title="Auto-advance clock [Enter]">
+          <span id="playIcon">▶</span> <span id="playText">Play</span>
+        </button>
+        <button id="resetBtn" class="btn" title="Reset to Initial State [R]">
+          <span>↺</span> Reset
+        </button>
+        <button id="clearStreamBtn" class="btn" title="Clear emitted PRBS sequence">
+          Clear stream
+        </button>
+      </div>
+
+      <!-- Register State Cards -->
+      <h3 class="section-subtitle">Register state</h3>
+      <div class="register-cards-grid" id="registerCards">
+        <!-- Injected via JS: Q3, Q2, Q1, Q0 cards -->
+      </div>
+
+      <!-- Register Diagram (SVG) -->
+      <div class="circuit-container">
+        <svg id="circuitSvg" class="circuit-svg" viewBox="0 0 620 180">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8" />
+            </marker>
+            <marker id="arrow-gold" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#fbbf24" />
+            </marker>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+
+          <!-- Dynamic SVG content drawn by JS -->
+          <g id="svgContent"></g>
+        </svg>
+        <div class="circuit-caption">Shift: Q3 → Q2 → Q1 → Q0; feedback enters Q3</div>
+      </div>
+
+      <!-- Math Equation Bar -->
+      <div class="formula-bar" id="formulaBar">
+        <!-- Rendered dynamically e.g. FB = Q3 ⊕ Q0 = 1 ⊕ 1 = 0 | Next = 0100 -->
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-label">Clock count</div>
+          <div class="stat-val" id="clockCountVal">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Output bit (Q0)</div>
+          <div class="stat-val" id="outputBitVal" style="color: var(--accent-cyan);">1</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Feedback bit</div>
+          <div class="stat-val" id="feedbackBitVal" style="color: var(--accent-emerald);">0</div>
+        </div>
+      </div>
+
+      <!-- Convention footnote -->
+      <div class="convention-note">
+        <strong>Convention:</strong> output = current Q0; feedback = selected taps XORed; next state = [feedback, Q3, Q2, Q1]. Tap names refer to register flip-flop labels, not 0-based array indexes.
+      </div>
+    </section>
+
+    <!-- Right Column: Truth Table & Continuous PRBS Stream -->
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      
+      <!-- Card 2: Next-state truth table -->
+      <section class="card table-card">
+        <div class="card-title">
+          <span>2. Next-state truth table</span>
+          <span id="cycleBadge" class="cycle-badge cycle-maximal">Maximal: 15</span>
+        </div>
+        <p class="card-desc">Rows show current state, selected tap values, feedback, output, and next state.</p>
+
+        <div class="table-container" id="tableContainer">
+          <table id="truthTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Current state</th>
+                <th>Tap A (<span id="thTapA">Q3</span>)</th>
+                <th>Tap B (<span id="thTapB">Q0</span>)</th>
+                <th>FB</th>
+                <th>OUT</th>
+                <th>Next state</th>
+              </tr>
+            </thead>
+            <tbody id="truthTableBody">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Card 3: Continuous PRBS stream -->
+      <section class="card">
+        <div class="card-title">
+          <span>3. Continuous PRBS stream</span>
+        </div>
+        <p class="card-desc">One output bit is emitted per clock. The newest bit is highlighted.</p>
+
+        <!-- Stream Display Box -->
+        <div class="stream-box" id="streamContainer">
+          <span class="prbs-label">PRBS =</span>
+          <span id="streamBitsContent" style="color: var(--text-dim); font-style: italic;">(empty)</span>
+        </div>
+
+        <!-- PRBS Action Buttons -->
+        <div class="btn-group" style="margin-bottom: 10px;">
+          <button id="copyBitsBtn" class="btn">
+            📋 Copy PRBS bits
+          </button>
+          <button id="runCycleBtn" class="btn">
+            ⚡ Generate until state repeats
+          </button>
+        </div>
+
+        <div class="stream-status-row">
+          <span>Output bits: <strong id="totalBitsCount" style="color: #fff;">0</strong></span>
+          <span>Current state: <strong id="statusCurrentState" style="color: var(--accent-cyan); font-family: var(--font-mono);">1001</strong></span>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Explanatory Footer Banner for Presentation -->
+  <aside class="info-footer-banner">
+    <div>
+      <strong>Key LFSR Concepts for Your Presentation:</strong>
+      <div style="margin-top: 4px;">
+        An all-zero seed remains locked at <code>0000</code> for XOR-feedback LFSRs because $0 \oplus 0 = 0$. Not every tap pair produces a maximal-length sequence. For a 4-bit maximal sequence (m-sequence), the period is $2^4 - 1 = 15$ non-zero states (e.g., taps <strong>Q3 & Q0</strong> or <strong>Q3 & Q2</strong>).
+      </div>
+    </div>
+    <div class="theory-pills">
+      <div class="theory-pill"><strong>Polynomial:</strong> $x^4 + x + 1$ (Taps Q3, Q0)</div>
+      <div class="theory-pill"><strong>PRBS Pattern:</strong> Pseudo-Random Binary Sequence</div>
+      <div class="theory-pill"><strong>Applications:</strong> SerDes Testing (PRBS7/15/31), Cryptography, CRC, GPS Gold codes</div>
+      <div class="theory-pill"><strong>Shortcut Keys:</strong> [Space] = Step | [Enter] = Play/Pause | [R] = Reset</div>
+    </div>
+  </aside>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">Copied to clipboard!</div>
+
+  <!-- Application Logic -->
+  <script>
+    // --- State variables ---
+    let state = [1, 0, 0, 1]; // [Q3, Q2, Q1, Q0]
+    let initialSeed = [1, 0, 0, 1];
+    let tapA = 3; // Index in Q: 3 means Q3
+    let tapB = 0; // Index in Q: 0 means Q0
+    let clockCount = 0;
+    let prbsStream = [];
+    let isPlaying = false;
+    let timerId = null;
+    let soundEnabled = true;
+
+    // Web Audio Synthesizer for mechanical tick
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function playTickSound(freq = 600, duration = 0.03) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        // Audio might be blocked until user gesture
+      }
+    }
+
+    // --- DOM Elements ---
+    const seedInput = document.getElementById('seedInput');
+    const tapASelect = document.getElementById('tapASelect');
+    const tapBSelect = document.getElementById('tapBSelect');
+    const speedSelect = document.getElementById('speedSelect');
+    const stepBtn = document.getElementById('stepBtn');
+    const playBtn = document.getElementById('playBtn');
+    const playIcon = document.getElementById('playIcon');
+    const playText = document.getElementById('playText');
+    const resetBtn = document.getElementById('resetBtn');
+    const clearStreamBtn = document.getElementById('clearStreamBtn');
+    const registerCards = document.getElementById('registerCards');
+    const svgContent = document.getElementById('svgContent');
+    const formulaBar = document.getElementById('formulaBar');
+    const clockCountVal = document.getElementById('clockCountVal');
+    const outputBitVal = document.getElementById('outputBitVal');
+    const feedbackBitVal = document.getElementById('feedbackBitVal');
+    const truthTableBody = document.getElementById('truthTableBody');
+    const tableContainer = document.getElementById('tableContainer');
+    const thTapA = document.getElementById('thTapA');
+    const thTapB = document.getElementById('thTapB');
+    const streamBitsContent = document.getElementById('streamBitsContent');
+    const streamContainer = document.getElementById('streamContainer');
+    const copyBitsBtn = document.getElementById('copyBitsBtn');
+    const runCycleBtn = document.getElementById('runCycleBtn');
+    const totalBitsCount = document.getElementById('totalBitsCount');
+    const statusCurrentState = document.getElementById('statusCurrentState');
+    const cycleBadge = document.getElementById('cycleBadge');
+    const soundToggle = document.getElementById('soundToggle');
+    const toast = document.getElementById('toast');
+
+    // Helper: format bit array to string
+    function toStr(arr) {
+      return arr.join('');
+    }
+
+    // Helper: compute next state from current state
+    function computeNext(currentState, tA, tB) {
+      const bitA = currentState[3 - tA];
+      const bitB = currentState[3 - tB];
+      const fb = bitA ^ bitB;
+      const out = currentState[3]; // Q0
+      const next = [fb, currentState[0], currentState[1], currentState[2]];
+      return { fb, out, bitA, bitB, next };
+    }
+
+    // Toast notice
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+
+    // --- Render Functions ---
+
+    // 1. Render Register Big Cards
+    function renderRegisterCards() {
+      registerCards.innerHTML = '';
+      for (let i = 3; i >= 0; i--) {
+        const val = state[3 - i];
+        const isTapA = (tapA === i);
+        const isTapB = (tapB === i);
+
+        const card = document.createElement('div');
+        let classes = ['reg-card'];
+        let tapLabel = '';
+
+        if (isTapA && isTapB) {
+          classes.push('tap-both');
+          tapLabel = ' · TAPS A&B';
+        } else if (isTapA) {
+          classes.push('tap-a');
+          tapLabel = ' · TAP A';
+        } else if (isTapB) {
+          classes.push('tap-b');
+          tapLabel = ' · TAP B';
+        }
+
+        card.className = classes.join(' ');
+        card.title = `Click to toggle bit Q${i}`;
+        card.innerHTML = `
+          <div class="reg-header">Q${i}${tapLabel}</div>
+          <div class="reg-val">${val}</div>
+          <div class="reg-click-hint">toggle</div>
+        `;
+
+        card.addEventListener('click', () => {
+          state[3 - i] = 1 - state[3 - i];
+          seedInput.value = toStr(state);
+          initialSeed = [...state];
+          playTickSound(440, 0.04);
+          updateAll();
+        });
+
+        registerCards.appendChild(card);
+      }
+    }
+
+    // 2. Render Circuit Diagram SVG
+    function renderCircuitSvg() {
+      const { fb, out } = computeNext(state, tapA, tapB);
+      
+      // Coordinates for 4 Flip-Flops: Q3, Q2, Q1, Q0
+      const boxes = [
+        { name: 'Q3', val: state[0], x: 80, y: 30, isTapA: tapA === 3, isTapB: tapB === 3 },
+        { name: 'Q2', val: state[1], x: 190, y: 30, isTapA: tapA === 2, isTapB: tapB === 2 },
+        { name: 'Q1', val: state[2], x: 300, y: 30, isTapA: tapA === 1, isTapB: tapB === 1 },
+        { name: 'Q0', val: state[3], x: 410, y: 30, isTapA: tapA === 0, isTapB: tapB === 0 }
+      ];
+
+      const boxW = 68;
+      const boxH = 50;
+
+      // Tap coords (center bottom of boxes)
+      const tapX_A = 80 + (3 - tapA) * 110 + boxW / 2;
+      const tapX_B = 80 + (3 - tapB) * 110 + boxW / 2;
+
+      let svg = '';
+
+      // Inter-register shift arrows (Q3 -> Q2 -> Q1 -> Q0)
+      for (let i = 0; i < 3; i++) {
+        const x1 = boxes[i].x + boxW;
+        const y = boxes[i].y + boxH / 2;
+        const x2 = boxes[i + 1].x;
+        svg += `
+          <line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow)" />
+        `;
+      }
+
+      // Flip-Flop Boxes
+      boxes.forEach(b => {
+        let strokeColor = '#1e3a5f';
+        let glowAttr = '';
+        if (b.isTapA && b.isTapB) {
+          strokeColor = '#c084fc';
+          glowAttr = 'filter="url(#glow)"';
+        } else if (b.isTapA) {
+          strokeColor = '#fbbf24';
+          glowAttr = 'filter="url(#glow)"';
+        } else if (b.isTapB) {
+          strokeColor = '#38bdf8';
+          glowAttr = 'filter="url(#glow)"';
+        }
+
+        svg += `
+          <g>
+            <rect x="${b.x}" y="${b.y}" width="${boxW}" height="${boxH}" rx="8" fill="#13223f" stroke="${strokeColor}" stroke-width="2" ${glowAttr} />
+            <text x="${b.x + boxW/2}" y="${b.y + 18}" fill="#94a3b8" font-size="11" font-weight="700" text-anchor="middle" font-family="var(--font-sans)">${b.name}</text>
+            <text x="${b.x + boxW/2}" y="${b.y + 40}" fill="#ffffff" font-size="20" font-weight="800" text-anchor="middle" font-family="var(--font-mono)">${b.val}</text>
+          </g>
+        `;
+      });
+
+      // Output arrow from Q0 to right
+      const q0RightX = boxes[3].x + boxW;
+      const q0MidY = boxes[3].y + boxH / 2;
+      svg += `
+        <!-- Output branch -->
+        <line x1="${q0RightX}" y1="${q0MidY}" x2="520" y2="${q0MidY}" stroke="#38bdf8" stroke-width="2.5" />
+        <line x1="520" y1="${q0MidY}" x2="520" y2="105" stroke="#38bdf8" stroke-width="2.5" />
+        <line x1="520" y1="105" x2="555" y2="105" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow)" />
+        <text x="560" y="128" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle" font-family="var(--font-sans)">Output = ${out}</text>
+      `;
+
+      // XOR Feedback Gate
+      // Placed around X: 270, Y: 110
+      const xorX = 225;
+      const xorY = 110;
+      const xorW = 100;
+      const xorH = 44;
+
+      // Routing Tap A line into XOR
+      svg += `
+        <!-- Tap A line -->
+        <path d="M ${tapX_A} ${boxes[0].y + boxH} L ${tapX_A} 100 L ${xorX + 25} 100 L ${xorX + 25} ${xorY}" 
+              fill="none" stroke="#fbbf24" stroke-width="2" />
+        <circle cx="${tapX_A}" cy="${boxes[0].y + boxH}" r="3" fill="#fbbf24" />
+      `;
+
+      // Routing Tap B line into XOR
+      svg += `
+        <!-- Tap B line -->
+        <path d="M ${tapX_B} ${boxes[0].y + boxH} L ${tapX_B} 100 L ${xorX + 75} 100 L ${xorX + 75} ${xorY}" 
+              fill="none" stroke="#38bdf8" stroke-width="2" />
+        <circle cx="${tapX_B}" cy="${boxes[0].y + boxH}" r="3" fill="#38bdf8" />
+      `;
+
+      // XOR Box / Module
+      svg += `
+        <rect x="${xorX}" y="${xorY}" width="${xorW}" height="${xorH}" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="2" />
+        <text x="${xorX + xorW/2}" y="${xorY + 16}" fill="#f59e0b" font-size="10" font-weight="700" text-anchor="middle" font-family="var(--font-sans)">XOR feedback</text>
+        <text x="${xorX + xorW/2}" y="${xorY + 36}" fill="#34d399" font-size="18" font-weight="800" text-anchor="middle" font-family="var(--font-mono)">${fb}</text>
+      `;
+
+      // Feedback return loop to Q3 input
+      // From left of XOR box (xorX, xorY + xorH/2) -> leftwards to x=32 -> up to y=boxes[0].y + boxH/2 -> right into Q3 (x=boxes[0].x)
+      svg += `
+        <!-- Feedback Loop Back -->
+        <path d="M ${xorX} ${xorY + xorH/2} L 32 ${xorY + xorH/2} L 32 ${boxes[0].y + boxH/2} L ${boxes[0].x} ${boxes[0].y + boxH/2}" 
+              fill="none" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#arrow-gold)" />
+      `;
+
+      svgContent.innerHTML = svg;
+    }
+
+    // 3. Render Formula Bar & Live Readout
+    function renderFormulaBar() {
+      const { fb, bitA, bitB, next } = computeNext(state, tapA, tapB);
+      formulaBar.innerHTML = `
+        <div class="formula-part-left">
+          FB = <span class="highlight-a">Q${tapA}</span> ⊕ <span class="highlight-b">Q${tapB}</span>
+          = <span class="highlight-a">${bitA}</span> ⊕ <span class="highlight-b">${bitB}</span>
+          = <span class="fb-result">${fb}</span>
+        </div>
+        <div class="formula-part-right">
+          Next state = <strong>${toStr(next)}</strong>
+        </div>
+      `;
+
+      clockCountVal.textContent = clockCount;
+      outputBitVal.textContent = state[3]; // Q0
+      feedbackBitVal.textContent = fb;
+      statusCurrentState.textContent = toStr(state);
+    }
+
+    // 4. Generate Precomputed Sequence & Truth Table
+    let tableSequence = [];
+    let cycleLength = 0;
+    let isMaximal = false;
+
+    function buildSequenceTable() {
+      thTapA.textContent = `Q${tapA}`;
+      thTapB.textContent = `Q${tapB}`;
+
+      // Simulate from initialSeed up to 30 steps or until loop
+      const visited = new Map();
+      let simState = [...initialSeed];
+      tableSequence = [];
+      let step = 0;
+      let repeatedAt = -1;
+
+      while (step < 32) {
+        const stateStr = toStr(simState);
+        if (visited.has(stateStr) && repeatedAt === -1) {
+          repeatedAt = step;
+          break;
+        }
+        visited.set(stateStr, step);
+
+        const { fb, out, bitA, bitB, next } = computeNext(simState, tapA, tapB);
+        tableSequence.push({
+          step,
+          stateStr,
+          bitA,
+          bitB,
+          fb,
+          out,
+          nextStr: toStr(next)
+        });
+
+        simState = next;
+        step++;
+      }
+
+      cycleLength = tableSequence.length;
+      isMaximal = (cycleLength === 15 && !toStr(initialSeed).includes('0000'));
+
+      // Cycle badge
+      if (cycleLength === 15) {
+        cycleBadge.className = 'cycle-badge cycle-maximal';
+        cycleBadge.textContent = `Maximal Period: 15 / 15`;
+      } else {
+        cycleBadge.className = 'cycle-badge cycle-short';
+        cycleBadge.textContent = `Period: ${cycleLength} states`;
+      }
+
+      // Render table rows
+      truthTableBody.innerHTML = '';
+      tableSequence.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.id = `row-step-${row.step}`;
+        tr.dataset.state = row.stateStr;
+
+        tr.innerHTML = `
+          <td>${row.step}</td>
+          <td style="font-weight: 700;">${row.stateStr}</td>
+          <td style="color: var(--accent-yellow);">${row.bitA}</td>
+          <td style="color: var(--accent-cyan);">${row.bitB}</td>
+          <td style="color: var(--accent-emerald); font-weight: 700;">${row.fb}</td>
+          <td style="font-weight: 700; color: #fff;">${row.out}</td>
+          <td>${row.nextStr}</td>
+        `;
+
+        // Click row to jump directly to this state
+        tr.style.cursor = 'pointer';
+        tr.title = `Click to set LFSR state to ${row.stateStr}`;
+        tr.addEventListener('click', () => {
+          state = row.stateStr.split('').map(Number);
+          seedInput.value = row.stateStr;
+          playTickSound(500, 0.04);
+          updateAll();
+        });
+
+        truthTableBody.appendChild(tr);
+      });
+
+      highlightActiveRow();
+    }
+
+    // Highlight row matching current state
+    function highlightActiveRow() {
+      const curStr = toStr(state);
+      const rows = truthTableBody.querySelectorAll('tr');
+      let foundActive = false;
+
+      rows.forEach(r => {
+        if (!foundActive && r.dataset.state === curStr) {
+          r.classList.add('active-step-row');
+          foundActive = true;
+          // Scroll row into view smoothly
+          r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          r.classList.remove('active-step-row');
+        }
+      });
+    }
+
+    // 5. Render PRBS Stream
+    function renderStream() {
+      if (prbsStream.length === 0) {
+        streamBitsContent.innerHTML = '<span style="color: var(--text-dim); font-style: italic;">(empty)</span>';
+        totalBitsCount.textContent = '0';
+        return;
+      }
+
+      totalBitsCount.textContent = prbsStream.length;
+
+      // Create tokens with the latest bit highlighted
+      const tokensHtml = prbsStream.map((bit, idx) => {
+        const isLatest = (idx === prbsStream.length - 1);
+        return `<span class="bit-token ${isLatest ? 'latest' : ''}">${bit}</span>`;
+      }).join(' ');
+
+      streamBitsContent.innerHTML = tokensHtml;
+      // Keep scroll anchored to newest
+      streamContainer.scrollTop = streamContainer.scrollHeight;
+    }
+
+    // Full UI Refresh
+    function updateAll() {
+      renderRegisterCards();
+      renderCircuitSvg();
+      renderFormulaBar();
+      highlightActiveRow();
+    }
+
+    // --- Actions ---
+
+    // Clock step
+    function clockStep() {
+      const outBit = state[3]; // Q0
+      prbsStream.push(outBit);
+
+      const { next } = computeNext(state, tapA, tapB);
+      state = next;
+      clockCount++;
+
+      playTickSound(700, 0.03);
+      updateAll();
+      renderStream();
+    }
+
+    // Play / Pause
+    function togglePlay() {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+    }
+
+    function play() {
+      isPlaying = true;
+      playBtn.classList.add('playing');
+      playIcon.textContent = '⏸';
+      playText.textContent = 'Pause';
+      const speed = parseInt(speedSelect.value, 10) || 400;
+      clearInterval(timerId);
+      timerId = setInterval(clockStep, speed);
+    }
+
+    function pause() {
+      isPlaying = false;
+      playBtn.classList.remove('playing');
+      playIcon.textContent = '▶';
+      playText.textContent = 'Play';
+      clearInterval(timerId);
+      timerId = null;
+    }
+
+    // Reset to Seed
+    function resetLFSR() {
+      pause();
+      state = [...initialSeed];
+      clockCount = 0;
+      updateAll();
+      playTickSound(300, 0.05);
+      showToast('Reset to initial seed ' + toStr(initialSeed));
+    }
+
+    // Clear PRBS Stream
+    function clearStream() {
+      prbsStream = [];
+      renderStream();
+      showToast('Cleared PRBS stream');
+    }
+
+    // Generate Until State Repeats (Full Period Run)
+    function runUntilRepeat() {
+      pause();
+      const seen = new Set();
+      let stepsRun = 0;
+      const maxSteps = 100;
+
+      while (stepsRun < maxSteps) {
+        const currentStr = toStr(state);
+        if (seen.has(currentStr)) {
+          break;
+        }
+        seen.add(currentStr);
+        clockStep();
+        stepsRun++;
+      }
+
+      showToast(`Completed cycle: ${stepsRun} steps generated`);
+    }
+
+    // Copy Bits to Clipboard
+    function copyBits() {
+      if (prbsStream.length === 0) {
+        showToast('Stream is empty!');
+        return;
+      }
+      const text = prbsStream.join('');
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`Copied ${prbsStream.length} PRBS bits!`);
+      }).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(`Copied ${prbsStream.length} bits!`);
+      });
+    }
+
+    // --- Event Listeners ---
+
+    // Seed Input Change
+    seedInput.addEventListener('input', (e) => {
+      let val = e.target.value.replace(/[^01]/g, '');
+      if (val.length > 4) val = val.slice(0, 4);
+      e.target.value = val;
+
+      if (val.length === 4) {
+        seedInput.classList.remove('invalid');
+        initialSeed = val.split('').map(Number);
+        state = [...initialSeed];
+        clockCount = 0;
+        buildSequenceTable();
+        updateAll();
+      } else {
+        seedInput.classList.add('invalid');
+      }
+    });
+
+    seedInput.addEventListener('blur', () => {
+      if (seedInput.value.length < 4) {
+        seedInput.value = toStr(initialSeed);
+        seedInput.classList.remove('invalid');
+      }
+    });
+
+    // Tap Selects
+    tapASelect.addEventListener('change', (e) => {
+      tapA = parseInt(e.target.value, 10);
+      buildSequenceTable();
+      updateAll();
+    });
+
+    tapBSelect.addEventListener('change', (e) => {
+      tapB = parseInt(e.target.value, 10);
+      buildSequenceTable();
+      updateAll();
+    });
+
+    // Speed Select
+    speedSelect.addEventListener('change', () => {
+      if (isPlaying) {
+        play(); // Re-trigger with new speed
+      }
+    });
+
+    // Buttons
+    stepBtn.addEventListener('click', clockStep);
+    playBtn.addEventListener('click', togglePlay);
+    resetBtn.addEventListener('click', resetLFSR);
+    clearStreamBtn.addEventListener('click', clearStream);
+    copyBitsBtn.addEventListener('click', copyBits);
+    runCycleBtn.addEventListener('click', runUntilRepeat);
+
+    // Audio Toggle
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundToggle.classList.toggle('active', soundEnabled);
+      soundToggle.textContent = soundEnabled ? '🔊 Audio: On' : '🔇 Audio: Off';
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        clockStep();
+      } else if (e.code === 'Enter') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        resetLFSR();
+      }
+    });
+
+    // Initial Setup
+    buildSequenceTable();
+    updateAll();
+    renderStream();
+
+  </script>
+</body>
+</html>

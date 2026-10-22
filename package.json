@@ -1,0 +1,9 @@
+{
+  "name": "interactive-lfsr-prbs",
+  "version": "1.0.0",
+  "description": "Interactive LFSR to Continuous PRBS Visualizer",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  }
+}
